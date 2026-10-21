@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gelişmiş Uzay Savaşı Oyunu</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #0b0b1a;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+        #game-wrapper {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+        /* Sol Panel (Canlı Mağaza) */
+        #shop-panel {
+            background: #11112b;
+            border: 2px solid #00ffff;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 0 20px rgba(0,255,255,0.2);
+            width: 220px;
+        }
+        #shop-panel h3 {
+            margin-top: 0;
+            font-size: 16px;
+            text-align: center;
+            color: #00ffff;
+        }
+        .upgrade-btn {
+            background: #1a1a3d;
+            color: white;
+            border: 1px solid #00ffff;
+            padding: 8px;
+            margin: 6px 0;
+            width: 100%;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 12px;
+            transition: 0.2s;
+            text-align: left;
+        }
+        .upgrade-btn:hover { background: #00ffff; color: #000; }
+        
+        #game-container {
+            text-align: center;
+            position: relative;
+        }
+        canvas {
+            background: #050510;
+            border: 3px solid #333366;
+            box-shadow: 0 0 25px rgba(0, 150, 255, 0.4);
+            cursor: crosshair;
+            display: block;
+        }
+        .ui {
+            position: absolute;
+            top: 10px;
+            left: 20px;
+            font-size: 16px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-shadow: 0 0 5px #00ffff;
+            display: flex;
+            gap: 12px;
+            background: rgba(0,0,0,0.6);
+            padding: 6px 12px;
+            border-radius: 8px;
+            border: 1px solid #333366;
+        }
+        span { color: #00ffff; }
+        .gold-span { color: #ffd700; }
+
+        /* Başlangıç ve Bildirim Ekranı */
+        #overlay-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 5, 16, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+        .start-box {
+            background: #11112b;
+            border: 2px solid #00ffff;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(0,255,255,0.4);
+        }
+        .start-btn {
+            background: #00ff88;
+            color: #000;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            margin-top: 15px;
+        }
+        .start-btn:hover { background: #00cc6a; }
+
+        /* Seviye Bildirim Yazısı */
+        #level-notification {
+            position: absolute;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 215, 0, 0.2);
+            border: 1px solid #ffd700;
+            color: #ffd700;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 15px;
+            display: none;
+            z-index: 5;
+            pointer-events: none;
+            text-shadow: 0 0 5px #ffd700;
+        }
+    </style>
+</head>
+<body>
+<div id="game-wrapper">
+    <!-- Sol Mağaza Paneli (Oyun Akarken Kullanılabilir) -->
+    <div id="shop-panel">
+        <h3>MAĞAZA & GELİŞTİRME</h3>
+        <p style="font-size:13px; text-align:center; margin:5px 0;">Altın: <span id="shop-gold" class="gold-span">0</span></p>
+        <button class="upgrade-btn" onclick="buyUpgrade('speed')">⚡ Hız (+10%)<br><span id="cost-speed">20</span> Altın</button>
+        <button class="upgrade-btn" onclick="buyUpgrade('damage')">💥 Hasar (+1)<br><span id="cost-damage">30</span> Altın</button>
+        <button class="upgrade-btn" onclick="buyUpgrade('fireRate')">🔫 Seri Ateş<br><span id="cost-fireRate">50</span> Altın</button>
+        <button class="upgrade-btn" onclick="buyUpgrade('maxHealth')">🛡️ Max Can (+25)<br><span id="cost-maxHealth">25</span> Altın</button>
+        <button class="upgrade-btn" onclick="buyUpgrade('heal')" style="border-color:#00ff88;">❤️ Canı Fullen (+20 Can)<br><span id="cost-heal">15</span> Altın</button>
+    </div>
+
+    <div id="game-container">
+        <!-- Seviye Atlandığında Üstte Çıkan Bildirim -->
+        <div id="level-notification">Tebrikler! Seviye 5'e Ulaştın! Savaş Devam Ediyor!</div>
+
+        <div class="ui">
+            <div>Puan: <span id="score">0</span></div>
+            <div>Can: <span id="health">100</span>/<span id="max-health-ui">100</span></div>
+            <div>Altın: <span id="gold" class="gold-span">0</span></div>
+            <div>Seviye: <span id="level">1</span></div>
+        </div>
+
+        <canvas id="gameCanvas" width="750" height="550"></canvas>
+
+        <!-- İlk Başlangıç Ekranı -->
+        <div id="overlay-screen">
+            <div class="start-box">
+                <h2>UZAY SAVAŞI</h2>
+                <p>WASD ile hareket et, Fare ile nişan al & ateş et!</p>
+                <p style="font-size: 13px; color: #aaa;">Sol panelden dilediğin zaman yükseltme yapabilirsin.</p>
+                <button class="start-btn" onclick="startGame()">OYUNA BAŞLA</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // UI Elementleri
+    const scoreEl = document.getElementById("score");
+    const healthEl = document.getElementById("health");
+    const maxHealthUiEl = document.getElementById("max-health-ui");
+    const goldEl = document.getElementById("gold");
+    const levelEl = document.getElementById("level");
+    const shopGoldEl = document.getElementById("shop-gold");
+    const overlayScreen = document.getElementById("overlay-screen");
+    const levelNotification = document.getElementById("level-notification");
+
+    // Ses Motoru (Web Audio API)
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playSound(type) {
+        if (!audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        let now = audioCtx.currentTime;
+
+        if (type === 'laser') {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(600, now);
+            osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
+            gainNode.gain.setValueAtTime(0.1, now);
+            gainNode.gain.linearRampToValueAtTime(0.01, now + 0.1);
+            osc.start(now); osc.stop(now + 0.1);
+        } else if (type === 'explosion') {
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(120, now);
+            osc.frequency.exponentialRampToValueAtTime(30, now + 0.2);
+            gainNode.gain.setValueAtTime(0.2, now);
+            gainNode.gain.linearRampToValueAtTime(0.01, now + 0.2);
+            osc.start(now); osc.stop(now + 0.2);
+        } else if (type === 'coin') {
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(900, now);
+            osc.frequency.setValueAtTime(1200, now + 0.08);
+            gainNode.gain.setValueAtTime(0.15, now);
+            gainNode.gain.linearRampToValueAtTime(0.01, now + 0.2);
+            osc.start(now); osc.stop(now + 0.2);
+        }
+    }
+
+    // Oyun İçi Değişkenler
+    let score = 0;
+    let gold = 0;
+    let level = 1;
+    let maxHealth = 100;
+    let health = maxHealth;
+    let gameRunning = false;
+
+    // Oyuncu İstatistikleri & Maliyetler
+    let stats = {
+        speed: 4,
+        damage: 1,
+        fireRate: 280
+    };
+
+    let costs = {
+        speed: 20,
+        damage: 30,
+        fireRate: 50,
+        maxHealth: 25,
+        heal: 15
+    };
+
+    const player = {
+        x: canvas.width / 2,
+        y: canvas.height / 2,
+        radius: 15,
+        angle: 0
+    };
+
+    let keys = { w: false, a: false, s: false, d: false };
+    let mouse = { x: 0, y: 0 };
+    let lastShotTime = 0;
+
+    let bullets = [];
+    let enemies = [];
+    let particles = [];
+    let coins = [];
+
+    // Kontroller
+    window.addEventListener("keydown", (e) => {
+        if (e.key === 'w' || e.key === 'W') keys.w = true;
+        if (e.key === 'a' || e.key === 'A') keys.a = true;
+        if (e.key === 's' || e.key === 'S') keys.s = true;
+        if (e.key === 'd' || e.key === 'D') keys.d = true;
+    });
+
+    window.addEventListener("keyup", (e) => {
+        if (e.key === 'w' || e.key === 'W') keys.w = false;
+        if (e.key === 'a' || e.key === 'A') keys.a = false;
+        if (e.key === 's' || e.key === 'S') keys.s = false;
+        if (e.key === 'd' || e.key === 'D') keys.d = false;
+    });
+
+    canvas.addEventListener("mousemove", (e) => {
+        const rect = canvas.getBoundingClientRect();
+        mouse.x = e.clientX - rect.left;
+        mouse.y = e.clientY - rect.top;
+    });
+
+    canvas.addEventListener("mousedown", () => {
+        if (!gameRunning) return;
+        let now = Date.now();
+        if (now - lastShotTime < stats.fireRate) return;
+        lastShotTime = now;
+
+        const angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+        bullets.push({
+            x: player.x,
+            y: player.y,
+            dx: Math.cos(angle) * 9,
+            dy: Math.sin(angle) * 9,
+            radius: 4,
+            damage: stats.damage
+        });
+        playSound('laser');
+    });
+
+    // Sol Panel Yükseltme İşlemleri
+    function buyUpgrade(type) {
+        if (type === 'speed' && gold >= costs.speed) {
+            gold -= costs.speed;
+            stats.speed *= 1.1;
+            costs.speed = Math.floor(costs.speed * 1.5);
+            document.getElementById("cost-speed").innerText = costs.speed;
+        } else if (type === 'damage' && gold >= costs.damage) {
+            gold -= costs.damage;
+            stats.damage += 1;
+            costs.damage = Math.floor(costs.damage * 1.6);
+            document.getElementById("cost-damage").innerText = costs.damage;
+        } else if (type === 'fireRate' && gold >= costs.fireRate) {
+            if (stats.fireRate > 100) {
+                gold -= costs.fireRate;
+                stats.fireRate -= 35;
+                costs.fireRate = Math.floor(costs.fireRate * 1.8);
+                document.getElementById("cost-fireRate").innerText = costs.fireRate;
+            } else {
+                alert("Ateş hızı son seviyede!");
+            }
+        } else if (type === 'maxHealth' && gold >= costs.maxHealth) {
+            gold -= costs.maxHealth;
+            maxHealth += 25;
+            health += 25; // Alırken canı da otomatik artır
+            costs.maxHealth = Math.floor(costs.maxHealth * 1.5);
+            document.getElementById("cost-maxHealth").innerText = costs.maxHealth;
+        } else if (type === 'heal' && gold >= costs.heal) {
+            if (health < maxHealth) {
+                gold -= costs.heal;
+                health = Math.min(maxHealth, health + 20);
+            } else {
+                alert("Canınız zaten tamamen dolu!");
+            }
+        } else {
+            alert("Yeterli altının yok!");
+        }
+        updateUI();
+    }
+
+    function updateUI() {
+        scoreEl.innerText = score;
+        healthEl.innerText = health;
+        maxHealthUiEl.innerText = maxHealth;
+        goldEl.innerText = gold;
+        levelEl.innerText = level;
+        shopGoldEl.innerText = gold;
+    }
+
+    function startGame() {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        overlayScreen.style.display = "none";
+        gameRunning = true;
+    }
+
+    // Düşman Üretici (Her 5. Seviyede Bosslar Gelir)
+    function spawnEnemy() {
+        if (!gameRunning) return;
+        
+        let x, y;
+        if (Math.random() < 0.5) {
+            x = Math.random() < 0.5 ? 0 : canvas.width;
+            y = Math.random() * canvas.height;
+        } else {
+            x = Math.random() * canvas.width;
+            y = Math.random() < 0.5 ? 0 : canvas.height;
+        }
+
+        let isBoss = (level % 5 === 0 && Math.random() < 0.35);
+        enemies.push({
+            x: x, y: y,
+            radius: isBoss ? 26 : 12,
+            speed: isBoss ? 1.3 : (1.5 + level * 0.1),
+            hp: isBoss ? (level * 6) : (2 + Math.floor(level / 2)),
+            maxHp: isBoss ? (level * 6) : (2 + Math.floor(level / 2)),
+            color: isBoss ? '#ff00ff' : '#ff3366',
+            goldDrop: isBoss ? 18 : 2,
+            isBoss: isBoss
+        });
+    }
+
+    setInterval(spawnEnemy, 1200);
+
+    function showLevelNotification(msg) {
+        levelNotification.innerText = msg;
+        levelNotification.style.display = "block";
+        setTimeout(() => {
+            levelNotification.style.display = "none";
+        }, 4000);
+    }
+
+    // Oyun Döngüsü
+    function update() {
+        if (!gameRunning) return;
+
+        // Seviye Atlama Kontrolü (Her 100 Puan)
+        let newLevel = Math.floor(score / 100) + 1;
+        if (newLevel > level) {
+            level = newLevel;
+            if (level % 5 === 0) {
+                showLevelNotification(`Tebrikler! Seviye ${level}'e Ulaştın! Güçlü Bosslar Geliyor!`);
+            } else {
+                showLevelNotification(`Tebrikler! Seviye ${level}'e Ulaştın! Savaş Devam Ediyor.`);
+            }
+        }
+
+        // Oyuncu Hareketi (WASD)
+        if (keys.w && player.y - player.radius > 0) player.y -= stats.speed;
+        if (keys.s && player.y + player.radius < canvas.height) player.y += stats.speed;
+        if (keys.a && player.x - player.radius > 0) player.x -= stats.speed;
+        if (keys.d && player.x + player.radius < canvas.width) player.x += stats.speed;
+
+        player.angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+
+        // Mermiler
+        bullets.forEach((bullet, index) => {
+            bullet.x += bullet.dx;
+            bullet.y += bullet.dy;
+            if (bullet.x < 0 || bullet.x > canvas.width || bullet.y < 0 || bullet.y > canvas.height) {
+                bullets.splice(index, 1);
+            }
+        });
+
+        // Coin Toplama
+        coins.forEach((coin, cIndex) => {
+            const dist = Math.hypot(player.x - coin.x, player.y - coin.y);
+            if (dist < player.radius + coin.radius + 10) {
+                gold += coin.value;
+                playSound('coin');
+                coins.splice(cIndex, 1);
+                updateUI();
+            }
+        });
+
+        // Düşmanlar
+        enemies.forEach((enemy, eIndex) => {
+            const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+            enemy.x += Math.cos(angle) * enemy.speed;
+            enemy.y += Math.sin(angle) * enemy.speed;
+
+            // Oyuncuya Çarpma
+            const distToPlayer = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+            if (distToPlayer < player.radius + enemy.radius) {
+                health -= enemy.isBoss ? 25 : 10;
+                playSound('explosion');
+                enemies.splice(eIndex, 1);
+                updateUI();
+                if (health <= 0) {
+                    gameRunning = false;
+                    alert("Oyun Bitti! Toplam Skorun: " + score + " | Toplam Altının: " + gold);
+                    location.reload();
+                }
+            }
+
+            // Mermi Çarpışması
+            bullets.forEach((bullet, bIndex) => {
+                const distToBullet = Math.hypot(bullet.x - enemy.x, bullet.y - enemy.y);
+                if (distToBullet < bullet.radius + enemy.radius) {
+                    enemy.hp -= bullet.damage;
+                    bullets.splice(bIndex, 1);
+
+                    if (enemy.hp <= 0) {
+                        for (let i = 0; i < (enemy.isBoss ? 15 : 5); i++) {
+                            particles.push({
+                                x: enemy.x, y: enemy.y,
+                                dx: (Math.random() - 0.5) * 5,
+                                dy: (Math.random() - 0.5) * 5,
+                                radius: Math.random() * 3 + 1,
+                                life: 25,
+                                color: enemy.isBoss ? '#ff00ff' : '#00ffff'
+                            });
+                        }
+
+                        coins.push({
+                            x: enemy.x, y: enemy.y,
+                            radius: 8,
+                            value: enemy.goldDrop
+                        });
+
+                        playSound('explosion');
+                        enemies.splice(eIndex, 1);
+                        score += enemy.isBoss ? 50 : 10;
+                        updateUI();
+                    }
+                }
+            });
+        });
+
+        // Parçacıklar
+        particles.forEach((p, index) => {
+            p.x += p.dx;
+            p.y += p.dy;
+            p.life--;
+            if (p.life <= 0) particles.splice(index, 1);
+        });
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Coinler
+        coins.forEach(coin => {
+            ctx.fillStyle = '#ffd700';
+            ctx.beginPath();
+            ctx.arc(coin.x, coin.y, coin.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#ff8800';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        });
+
+        // Parçacıklar
+        particles.forEach(p => {
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        // Mermiler
+        ctx.fillStyle = '#00ffff';
+        bullets.forEach(bullet => {
+            ctx.beginPath();
+            ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        // Düşmanlar & Can Barları
+        enemies.forEach(enemy => {
+            ctx.fillStyle = enemy.color;
+            ctx.beginPath();
+            ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = 'red';
+            ctx.fillRect(enemy.x - 15, enemy.y - enemy.radius - 10, 30, 4);
+            ctx.fillStyle = 'green';
+            ctx.fillRect(enemy.x - 15, enemy.y - enemy.radius - 10, (30 * (enemy.hp / enemy.maxHp)), 4);
+        });
+
+        // Oyuncu Gemisi
+        ctx.save();
+        ctx.translate(player.x, player.y);
+        ctx.rotate(player.angle);
+        
+        ctx.fillStyle = '#00ffcc';
+        ctx.beginPath();
+        ctx.moveTo(16, 0);
+        ctx.lineTo(-10, -10);
+        ctx.lineTo(-5, 0);
+        ctx.lineTo(-10, 10);
+        ctx.closePath();
+        ctx.fill();
+        
+        ctx.restore();
+    }
+
+    function loop() {
+        update();
+        draw();
+        requestAnimationFrame(loop);
+    }
+
+    updateUI();
+    loop();
+</script>
+
+</body>
+</html>
